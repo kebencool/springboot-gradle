@@ -1,0 +1,75 @@
+buildscript {
+    ext {
+        springBootVersion = '2.1.2.RELEASE'
+    }
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:${springBootVersion}")
+        //添加gradle-docker 依赖，版本1.2
+        classpath 'se.transmode.gradle:gradle-docker:1.2'
+    }
+}
+
+apply plugin: 'java'
+apply plugin: 'org.springframework.boot'
+apply plugin: 'io.spring.dependency-management'
+//apply plugin: 'application' //可选配置
+apply plugin: 'docker'
+group = 'kebencool'
+
+version = '0.0.1-SNAPSHOT'
+sourceCompatibility = '1.8'
+
+jar {
+    baseName = 'springboot-gradle'
+    version = '0.0.1-SNAPSHOT'
+}
+
+docker {
+    baseImage 'store/oracle/serverjre:8'
+    maintainer 'kebencool kebencool@keben'
+    registry 'example'
+}
+task dockerBuilder(type: Docker) {
+    applicationName = jar.baseName
+    tagVersion = jar.version
+    volume('/tmp')
+    //发布到远程docker hub仓库
+    push = project.hasProperty('push')
+    addFile("${jar.baseName}-${jar.version}.jar","app.jar")
+    entryPoint(["java","-Djava.security.egd=file:/dev/./urandom","-jar",'app.jar'])
+    exposePort(8761)
+    doFirst {
+        copy {
+            from jar
+            into stageDir
+        }
+    }
+}
+
+repositories {
+    mavenLocal()
+    //使用阿里云镜像
+    maven { url 'http://maven.aliyun.com/nexus/content/groups/public/' }
+    mavenCentral()
+    maven { url "https://repo.spring.io/milestone" }
+
+}
+ext {
+    set('springCloudVersion', 'Greenwich.RELEASE')
+}
+
+dependencies {
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-client'
+    runtimeOnly 'mysql:mysql-connector-java'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    implementation 'org.springframework.cloud:spring-cloud-starter-netflix-eureka-server:2.1.0.RELEASE'
+}
+
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+    }
+}
